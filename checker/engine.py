@@ -2,7 +2,6 @@
 
 from typing import Any, Callable
 
-from checker.cases.category_case import run as run_category_case
 from checker.cases.consistency_case import run as run_consistency_case
 from checker.cases.description_logic_case import run as run_description_logic_case
 from checker.cases.description_quality_case import run as run_description_quality_case
@@ -19,7 +18,6 @@ ALL_CASES: list[CaseRunner] = [
     run_size_chart_case,
     run_description_logic_case,
     run_description_quality_case,
-    run_category_case,
     run_review_case,
     run_consistency_case,
 ]
@@ -30,6 +28,3 @@ def run_all(product_data: dict[str, Any]) -> list[dict[str, str]]:
     for case in ALL_CASES:
         issues.extend(case(product_data))
     return issues
-
-
-
