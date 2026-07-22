@@ -235,20 +235,64 @@ function metaLine(label, value) {
 }
 
 async function checkOneProduct(url) {
+  try {
+    return await checkProductByServer(url);
+  } catch (error) {
+    if (!shouldTryBrowserProxy(error)) throw error;
+    setStatus("Browser proxy");
+    return checkProductByBrowserProxy(url);
+  }
+}
+
+async function checkProductByServer(url) {
   const response = await fetch(apiUrl("/api/check"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ url })
   });
+  return parseJsonResponse(response, "Product check failed.");
+}
 
+async function checkProductByBrowserProxy(url) {
+  const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`;
+  const htmlResponse = await fetch(proxyUrl, {
+    method: "GET",
+    headers: { "Accept": "text/html,application/xhtml+xml" }
+  });
+  if (!htmlResponse.ok) {
+    throw new Error(`Browser proxy failed: ${htmlResponse.status} ${htmlResponse.statusText}`);
+  }
+
+  const html = await htmlResponse.text();
+  if (!html || html.length < 500) {
+    throw new Error("Browser proxy returned an empty or invalid product page.");
+  }
+
+  const response = await fetch(apiUrl("/api/check-html"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url, html })
+  });
+  return parseJsonResponse(response, "Product HTML check failed.");
+}
+
+async function parseJsonResponse(response, fallbackMessage) {
   const contentType = response.headers.get("content-type") || "";
   if (!contentType.includes("application/json")) {
     throw new Error("The checker API did not return JSON. Make sure the Flask backend is running at http://127.0.0.1:5000.");
   }
 
   const payload = await response.json();
-  if (!response.ok) throw new Error(payload.error || "Product check failed.");
+  if (!response.ok) throw new Error(payload.error || fallbackMessage);
   return payload;
+}
+
+function shouldTryBrowserProxy(error) {
+  const message = String(error?.message || "").toLowerCase();
+  return message.includes("403")
+    || message.includes("forbidden")
+    || message.includes("source site may be blocking")
+    || message.includes("scraper_proxy_url");
 }
 
 async function runCheck() {
@@ -334,5 +378,6 @@ function setupProductChecker() {
 
 setupNavigation();
 setupProductChecker();
+
 
 

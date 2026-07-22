@@ -41,6 +41,13 @@ SCRAPER_PROXY_URL=http://user:password@proxy-host:port
 ```
 
 The same proxy is used by Product Checker and backend Link Checker requests.
+## Browser Proxy Fallback
+
+The legacy GitHub Pages link checker works because it sends requests through `https://corsproxy.io/` from the browser. It is not using GitHub's IP.
+
+Product Checker now keeps server-side HTML scraping as the first attempt. If Render is blocked by RFS with `403 Forbidden`, the browser can fetch the product HTML through `corsproxy.io` and send that raw HTML back to `/api/check-html` for parsing and test execution. This still parses the HTML page and does not use the RFS WooCommerce or WordPress API.
+
+This public proxy fallback is useful for testing, but a controlled company-approved proxy via `SCRAPER_PROXY_URL` is still the more stable production option.
 
 ## Local Run
 
@@ -83,3 +90,4 @@ Recommended deployment flow:
    - Start command: `gunicorn --workers 2 --threads 4 --timeout 120 web_app:app`
 
 `render.yaml` and `Procfile` are included for deployment-friendly hosting.
+

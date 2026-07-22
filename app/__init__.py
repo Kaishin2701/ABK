@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 import requests
 from flask import Flask, jsonify, make_response, render_template, request
 
-from app.controller import check_product_url
+from app.controller import check_product_html, check_product_url
 from checker.config import load_json_config
 from scraper.product_scraper import is_valid_url, proxy_config
 
@@ -48,6 +48,26 @@ def check_product():
 
     return jsonify({"product": product_data, "issues": issues})
 
+@app.route("/api/check-html", methods=["POST", "OPTIONS"])
+def check_product_from_html():
+    if request.method == "OPTIONS":
+        return make_response("", 204)
+
+    payload: dict[str, Any] = request.get_json(silent=True) or {}
+    url = str(payload.get("url") or "").strip()
+    page_html = str(payload.get("html") or "")
+
+    if not is_valid_url(url):
+        return jsonify({"error": "Please enter a valid URL starting with http:// or https://"}), 400
+    if len(page_html) < 500:
+        return jsonify({"error": "The provided HTML is too short to parse as a product page."}), 400
+
+    try:
+        product_data, issues = check_product_html(url, page_html)
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+    return jsonify({"product": product_data, "issues": issues, "source": "browser_proxy_html"})
 
 def _is_current_app_url(url: str) -> bool:
     target = urlparse(url)
@@ -129,4 +149,6 @@ def health():
 def main() -> None:
     port = int(os.environ.get("PORT", "5000"))
     app.run(host="0.0.0.0", port=port, debug=os.environ.get("FLASK_DEBUG") == "1")
+
+
 
