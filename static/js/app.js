@@ -52,6 +52,15 @@ const summaryReviews = document.getElementById("summaryReviews");
 
 let batchProducts = [];
 
+const PROXY_FIRST_HOSTS = [
+  "replicafootballshirt.com",
+  "www.replicafootballshirt.com",
+  "kidsfootballkit.co.uk",
+  "www.kidsfootballkit.co.uk"
+];
+const PRODUCT_CHECK_CONCURRENCY = 3;
+const LAST_GOOD_PROXY_KEY = "abk:lastGoodBrowserProxy";
+
 const severityConfigNode = document.getElementById("severity-config");
 let severityStyles = fallbackSeverityStyles;
 try {
@@ -235,6 +244,11 @@ function metaLine(label, value) {
 }
 
 async function checkOneProduct(url) {
+  if (shouldUseBrowserProxyFirst(url)) {
+    setStatus("Proxy first");
+    return checkProductByBrowserProxy(url);
+  }
+
   try {
     return await checkProductByServer(url);
   } catch (error) {
@@ -265,6 +279,7 @@ async function checkProductByBrowserProxy(url) {
       });
       const payload = await parseJsonResponse(response, "Product HTML check failed.");
       payload.proxy_source = proxy.name;
+      rememberGoodProxy(proxy.name);
       return payload;
     } catch (error) {
       attempts.push(`${proxy.name}: ${error.message}`);
@@ -275,17 +290,28 @@ async function checkProductByBrowserProxy(url) {
 
 function browserProxyUrls(url) {
   const encoded = encodeURIComponent(url);
-  return [
+  const proxies = [
     { name: "corsproxy.io", url: `https://corsproxy.io/?${encoded}` },
     { name: "AllOrigins raw", url: `https://api.allorigins.win/raw?url=${encoded}` },
     { name: "CodeTabs proxy", url: `https://api.codetabs.com/v1/proxy?quest=${encoded}` },
     { name: "Proxy.CORS.sh", url: `https://proxy.cors.sh/${url}` }
   ];
+  const lastGoodProxy = localStorage.getItem(LAST_GOOD_PROXY_KEY);
+  if (!lastGoodProxy) return proxies;
+  return [...proxies].sort((a, b) => (a.name === lastGoodProxy ? -1 : 0) + (b.name === lastGoodProxy ? 1 : 0));
+}
+
+function rememberGoodProxy(proxyName) {
+  try {
+    localStorage.setItem(LAST_GOOD_PROXY_KEY, proxyName);
+  } catch (_error) {
+    // Ignore private browsing or storage-disabled environments.
+  }
 }
 
 async function fetchHtmlThroughProxy(proxy) {
   const controller = new AbortController();
-  const timer = window.setTimeout(() => controller.abort(), 25000);
+  const timer = window.setTimeout(() => controller.abort(), 12000);
   try {
     const htmlResponse = await fetch(proxy.url, {
       method: "GET",
@@ -329,6 +355,56 @@ function shouldTryBrowserProxy(error) {
     || message.includes("scraper_proxy_url");
 }
 
+function shouldUseBrowserProxyFirst(url) {
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    return PROXY_FIRST_HOSTS.includes(host);
+  } catch (_error) {
+    return false;
+  }
+}
+
+async function runProductChecksConcurrently(results) {
+  let nextIndex = 0;
+  let completed = 0;
+  const workerCount = Math.min(PRODUCT_CHECK_CONCURRENCY, results.length);
+
+  async function worker() {
+    while (nextIndex < results.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      results[index].status = "checking";
+      renderBatchTable(results);
+      setStatus(`${completed + 1}/${results.length}`);
+
+      try {
+        const payload = await checkOneProduct(results[index].url);
+        results[index] = {
+          ...results[index],
+          status: "done",
+          product: payload.product || {},
+          issues: payload.issues || [],
+          source: payload.source || payload.proxy_source || "server"
+        };
+      } catch (error) {
+        results[index] = {
+          ...results[index],
+          status: "error",
+          error: error.message,
+          product: null,
+          issues: []
+        };
+      }
+
+      completed += 1;
+      renderBatchTable(results);
+      updateSummaryForBatch(results);
+      setStatus(`${completed}/${results.length}`);
+    }
+  }
+
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
+}
 async function runCheck() {
   const urls = parseProductUrls();
   errorText.textContent = "";
@@ -352,32 +428,7 @@ async function runCheck() {
   setBatchMode(`Checking ${urls.length} product(s)...`);
   renderBatchTable(batchProducts);
 
-  for (let index = 0; index < batchProducts.length; index += 1) {
-    batchProducts[index].status = "checking";
-    renderBatchTable(batchProducts);
-    setStatus(`${index + 1}/${batchProducts.length}`);
-
-    try {
-      const payload = await checkOneProduct(batchProducts[index].url);
-      batchProducts[index] = {
-        ...batchProducts[index],
-        status: "done",
-        product: payload.product || {},
-        issues: payload.issues || []
-      };
-    } catch (error) {
-      batchProducts[index] = {
-        ...batchProducts[index],
-        status: "error",
-        error: error.message,
-        product: null,
-        issues: []
-      };
-    }
-
-    renderBatchTable(batchProducts);
-    updateSummaryForBatch(batchProducts);
-  }
+  await runProductChecksConcurrently(batchProducts);
 
   const failCount = batchProducts.filter((item) => evaluationFor(item) === "FAIL").length;
   checkerOutput.classList.remove("empty-state");
@@ -412,6 +463,8 @@ function setupProductChecker() {
 
 setupNavigation();
 setupProductChecker();
+
+
 
 
 
