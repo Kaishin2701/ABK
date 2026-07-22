@@ -241,22 +241,37 @@ async function checkLinkWithBrowserProxy(url) {
   const attempts = [];
   for (const proxy of linkBrowserProxyUrls(url)) {
     try {
-      const response = await fetchWithTimeout(proxy.url, { method: "HEAD" }, 12000);
-      if (response.status === 405) {
-        const getResponse = await fetchWithTimeout(proxy.url, { method: "GET", headers: { "Accept": "text/html,*/*" } }, 12000);
-        rememberGoodLinkProxy(proxy.name);
+      const response = await fetchWithTimeout(proxy.url, { method: "GET", headers: { "Accept": "text/html,*/*" } }, 12000);
+      if (response.status === 404) {
         return {
-          ok: getResponse.status >= 200 && getResponse.status < 400,
-          status_code: getResponse.status,
-          message: `${getResponse.statusText || "Checked"} via ${proxy.name}`,
+          ok: false,
+          status_code: 404,
+          message: `Not Found via ${proxy.name}`,
           final_url: url
         };
       }
+      if (response.status === 403 || response.status === 429 || response.status >= 500) {
+        throw new Error(`${response.status} ${response.statusText || "proxy/target blocked"}`.trim());
+      }
+      if (!response.ok) {
+        return {
+          ok: false,
+          status_code: response.status,
+          message: `${response.statusText || "Checked"} via ${proxy.name}`,
+          final_url: url
+        };
+      }
+
+      const html = await response.text();
+      if (!html || html.length < 100) {
+        throw new Error("returned empty response");
+      }
+
       rememberGoodLinkProxy(proxy.name);
       return {
-        ok: response.status >= 200 && response.status < 400,
+        ok: true,
         status_code: response.status,
-        message: `${response.statusText || "Checked"} via ${proxy.name}`,
+        message: `OK via ${proxy.name}`,
         final_url: url
       };
     } catch (error) {
@@ -494,4 +509,5 @@ setupWatermark();
 setupLinkChecker();
 setupHtmlCleaner();
 setupSkuGenerator();
+
 
