@@ -63,7 +63,7 @@ def fetch_html(url: str, timeout: int = 30) -> str:
                     "403 Forbidden while fetching product page through SCRAPER_PROXY_URL. "
                     "The proxy IP is also blocked by the source site."
                     if proxies
-                    else "403 Forbidden while fetching product page. Set SCRAPER_PROXY_URL on Render to use an approved proxy/VPN IP."
+                    else "403 Forbidden while fetching product page. Set SCRAPER_PROXY_URL to use an approved proxy/VPN IP."
                 )
                 raise requests.HTTPError(hint) from exc
             raise
@@ -77,3 +77,4 @@ def scrape_product(url: str) -> dict:
 def is_valid_url(url: str) -> bool:
     parsed = urlparse(url)
     return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
+

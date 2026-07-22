@@ -1,53 +1,43 @@
-﻿# ABK Tool
+﻿# ABK Product Checker App
 
-ABK Tool is a Flask web application for checking and preparing Replica Football Shirt product listings. The app combines the product QA checker with supporting listing utilities in one browser-based dashboard.
+ABK Product Checker is a desktop Tkinter application for checking Replica Football Shirt product listings from product URLs.
 
-## Main Features
+The project is now App-first and contains only the desktop application plus the scraper/checker core.
 
-- Product Checker: paste one or more product URLs, run all configured test cases, and review PASS/FAIL results per product.
-- Detailed issue view: click a product row, then use View more to inspect the test case, found value, expected value, and explanation.
-- Auto Watermark: batch process product images in the browser and export WebP files or a ZIP package.
-- Link Checker: check multiple URLs through the Flask backend.
-- HTML Cleaner: clean pasted HTML by removing unnecessary wrapper tags and unsafe/unneeded attributes.
-- SKU Generator: generate size variant SKUs for AD, KD, and ADK/KD product patterns.
+## Features
 
-## Source Structure
+- Check one or many product URLs in a single run.
+- Display one result row per product with URL, SKU, issue count, and PASS/FAIL evaluation.
+- Click a result row to inspect detailed issues and extracted product data.
+- Extract product information from HTML pages:
+  - Title
+  - SKU
+  - Tags
+  - Categories
+  - Short description
+  - Review count
+  - Base price and size-level prices/SKUs
+  - Global form options
+  - Image count and image metadata
+  - Long description
+  - Additional information
+- Run configurable test cases from `checker/cases/`.
+- Keep rules editable in JSON under `config/`.
+
+## Project Structure
 
 ```text
 ABK_CHECKER_2/
-├── app/                  # Flask app, web routes, and API endpoints
-├── checker/              # Test case engine and checker models
+├── app/                  # Desktop GUI and controller layer
+├── checker/              # Test engine, issue model, and cases
 │   └── cases/            # Individual product test cases
-├── config/               # Editable JSON rules for prices, categories, sizes, descriptions, etc.
-├── data/                 # Reference data such as RFS category mapping
-├── scraper/              # HTML scraping and parsing logic
-├── static/               # CSS, JavaScript, logo, and watermark assets
-├── templates/            # Flask HTML template
-├── main.py               # Local entry point
-├── web_app.py            # Compatibility entry point for gunicorn
-├── requirements.txt      # Python dependencies
-├── Procfile              # Platform start command
-└── render.yaml           # Render deployment config
+├── config/               # Editable JSON rules
+├── data/                 # Reference category data
+├── scraper/              # HTML scraper and parser
+├── tests/                # Test files
+├── main.py               # Desktop app entry point
+└── requirements.txt      # Runtime dependencies
 ```
-
-## Scraping Policy
-
-The Product Checker uses HTML page scraping only. It does not use the RFS WooCommerce or WordPress API.
-
-If the source website blocks the Render server IP with `403 Forbidden`, configure a permitted proxy/VPN endpoint with this environment variable:
-
-```text
-SCRAPER_PROXY_URL=http://user:password@proxy-host:port
-```
-
-The same proxy is used by Product Checker and backend Link Checker requests.
-## Browser Proxy Fallback
-
-The legacy GitHub Pages link checker works because it sends requests through `https://corsproxy.io/` from the browser. It is not using GitHub's IP.
-
-Product Checker now keeps server-side HTML scraping as the first attempt. If Render is blocked by RFS with `403 Forbidden`, the browser can fetch the product HTML through `corsproxy.io` and send that raw HTML back to `/api/check-html` for parsing and test execution. This still parses the HTML page and does not use the RFS WooCommerce or WordPress API.
-
-This public proxy fallback is useful for testing, but a controlled company-approved proxy via `SCRAPER_PROXY_URL` is still the more stable production option.
 
 ## Local Run
 
@@ -57,37 +47,17 @@ Install dependencies:
 pip install -r requirements.txt
 ```
 
-Start the web app:
+Start the app:
 
 ```powershell
 python main.py
 ```
 
-Open:
+## Notes
+
+The scraper uses HTML page requests only. If a source website blocks a server/datacenter IP, run the desktop app from a network that can access that website, or configure an approved proxy through:
 
 ```text
-http://127.0.0.1:5000/
+SCRAPER_PROXY_URL=http://user:password@proxy-host:port
 ```
-
-## API Endpoints
-
-- `GET /` renders the web dashboard.
-- `GET /health` returns a simple health check.
-- `POST /api/check` checks one product URL.
-- `POST /api/link-check` checks one generic URL for the Link Checker tool.
-
-## Deploy From GitHub
-
-This project needs a Python backend because the scraper and checker run server-side. GitHub Pages is static-only and cannot run the Python scraper.
-
-Recommended deployment flow:
-
-1. Push this repository to GitHub.
-2. Create a new Web Service on Render or another Python-friendly host.
-3. Connect the GitHub repository.
-4. Use:
-   - Build command: `pip install -r requirements.txt`
-   - Start command: `gunicorn --workers 2 --threads 4 --timeout 120 web_app:app`
-
-`render.yaml` and `Procfile` are included for deployment-friendly hosting.
 
