@@ -254,26 +254,60 @@ async function checkProductByServer(url) {
 }
 
 async function checkProductByBrowserProxy(url) {
-  const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`;
-  const htmlResponse = await fetch(proxyUrl, {
-    method: "GET",
-    headers: { "Accept": "text/html,application/xhtml+xml" }
-  });
-  if (!htmlResponse.ok) {
-    throw new Error(`Browser proxy failed: ${htmlResponse.status} ${htmlResponse.statusText}`);
+  const attempts = [];
+  for (const proxy of browserProxyUrls(url)) {
+    try {
+      const html = await fetchHtmlThroughProxy(proxy);
+      const response = await fetch(apiUrl("/api/check-html"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url, html })
+      });
+      const payload = await parseJsonResponse(response, "Product HTML check failed.");
+      payload.proxy_source = proxy.name;
+      return payload;
+    } catch (error) {
+      attempts.push(`${proxy.name}: ${error.message}`);
+    }
   }
+  throw new Error(`Browser proxy failed. ${attempts.join(" | ")}`);
+}
 
-  const html = await htmlResponse.text();
-  if (!html || html.length < 500) {
-    throw new Error("Browser proxy returned an empty or invalid product page.");
+function browserProxyUrls(url) {
+  const encoded = encodeURIComponent(url);
+  return [
+    { name: "corsproxy.io", url: `https://corsproxy.io/?${encoded}` },
+    { name: "AllOrigins raw", url: `https://api.allorigins.win/raw?url=${encoded}` },
+    { name: "CodeTabs proxy", url: `https://api.codetabs.com/v1/proxy?quest=${encoded}` },
+    { name: "Proxy.CORS.sh", url: `https://proxy.cors.sh/${url}` }
+  ];
+}
+
+async function fetchHtmlThroughProxy(proxy) {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), 25000);
+  try {
+    const htmlResponse = await fetch(proxy.url, {
+      method: "GET",
+      headers: { "Accept": "text/html,application/xhtml+xml" },
+      signal: controller.signal
+    });
+    if (!htmlResponse.ok) {
+      throw new Error(`${htmlResponse.status} ${htmlResponse.statusText}`.trim());
+    }
+    const html = await htmlResponse.text();
+    if (!looksLikeProductHtml(html)) {
+      throw new Error("returned non-product or empty HTML");
+    }
+    return html;
+  } finally {
+    window.clearTimeout(timer);
   }
+}
 
-  const response = await fetch(apiUrl("/api/check-html"), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ url, html })
-  });
-  return parseJsonResponse(response, "Product HTML check failed.");
+function looksLikeProductHtml(html) {
+  const text = String(html || "").toLowerCase();
+  return text.length >= 500 && (text.includes("<html") || text.includes("product_title") || text.includes("woocommerce"));
 }
 
 async function parseJsonResponse(response, fallbackMessage) {
@@ -378,6 +412,7 @@ function setupProductChecker() {
 
 setupNavigation();
 setupProductChecker();
+
 
 
 
