@@ -75,10 +75,15 @@ function parseProductUrls() {
   return [...new Set(urls)];
 }
 
+function issueCountFor(result) {
+  if (result.status === "error") return 1;
+  return (result.issues || []).length;
+}
+
 function updateSummaryForBatch(results) {
   const completed = results.filter((item) => item.status === "done" || item.status === "error");
   const failed = results.filter((item) => item.status === "error" || (item.issues || []).length > 0);
-  const totalIssues = results.reduce((sum, item) => sum + (item.issues || []).length, 0);
+  const totalIssues = results.reduce((sum, item) => sum + issueCountFor(item), 0);
   summaryResult.textContent = completed.length ? `${completed.length}/${results.length}` : "Waiting";
   summaryIssues.textContent = String(totalIssues);
   summarySku.textContent = results.length === 1 ? (results[0].product?.sku || "-") : `${failed.length} Fail`;
@@ -118,7 +123,7 @@ function renderBatchTable(results) {
 
     urlCell.textContent = result.url;
     skuCell.textContent = result.product?.sku || (result.status === "checking" ? "Checking..." : "-");
-    issuesCell.textContent = result.status === "checking" ? "-" : String((result.issues || []).length);
+    issuesCell.textContent = result.status === "checking" ? "-" : String(issueCountFor(result));
     evaluationCell.textContent = evaluationFor(result);
     evaluationCell.className = evaluationCell.textContent === "PASS" ? "eval-pass" : evaluationCell.textContent === "FAIL" ? "eval-fail" : "";
 
@@ -147,7 +152,7 @@ function showProductDetail(index) {
 
   const heading = document.createElement("div");
   heading.className = "detail-heading";
-  heading.textContent = `${result.product?.sku || "No SKU"} - ${evaluationFor(result)}`;
+  heading.textContent = `${result.product?.sku || "No SKU"} - ${evaluationFor(result)}${result.status === "error" ? " - Fetch error" : ""}`;
   productDetail.appendChild(heading);
 
   if (result.error) {
@@ -329,4 +334,5 @@ function setupProductChecker() {
 
 setupNavigation();
 setupProductChecker();
+
 
