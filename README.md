@@ -1,35 +1,31 @@
-﻿# ABK Tool App
+﻿# ABK Product Checker
 
-ABK Tool App is a desktop Tkinter application for product listing work. It keeps the functionality from the previous web version, but runs locally as an app.
+Web app for checking RFS product listings from a product URL.
 
-## Features
-
-- Product Checker: check one or many product URLs, show SKU, issue count, PASS/FAIL, detailed issues, and extracted product JSON log.
-- Auto Watermark: select images, choose watermark logo, mode, quality, opacity, rename template, and export WebP files.
-- Link Checker: scan multiple URLs, check status, filter live/dead/error results.
-- HTML Cleaner: clean pasted HTML by removing wrapper layout tags and unsupported attributes.
-- SKU Generator: generate AD, KD, and ADK/KD size SKU variants, copy output, or export CSV.
-
-## Project Structure
-
-```text
-ABK_CHECKER_2/
-├── app/                  # Desktop GUI and controller layer
-├── checker/              # Product test engine and cases
-├── config/               # Editable JSON rules
-├── data/                 # Reference data
-├── scraper/              # Product HTML scraper and parser
-├── static/assets/        # Desktop app logo
-├── static/watermark/     # Default watermark assets
-├── main.py               # Desktop app entry point
-└── requirements.txt      # Runtime dependencies
-```
-
-## Run Locally
+## Local Run
 
 ```powershell
 pip install -r requirements.txt
 python main.py
 ```
 
-The app uses direct HTML requests for product and link checks. If a website blocks your network, run the app from a network/VPN that can access that website.
+Open:
+
+```text
+http://localhost:5000
+```
+
+## Deploy From GitHub
+
+This project needs a Python backend because the scraper runs server-side. GitHub Pages is static-only and cannot run the Python scraper.
+
+Recommended deployment flow:
+
+1. Push this repo to GitHub.
+2. Create a new Web Service on Render.
+3. Connect the GitHub repository.
+4. Use:
+   - Build command: `pip install -r requirements.txt`
+   - Start command: `gunicorn web_app:app`
+
+`render.yaml` and `Procfile` are included for platform-friendly deployment.
