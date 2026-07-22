@@ -195,6 +195,107 @@ function setupWatermark() {
   gallery.addEventListener("drop", handleDrop);
 }
 
+
+const LINK_PROXY_FIRST_HOSTS = [
+  "replicafootballshirt.com",
+  "www.replicafootballshirt.com",
+  "kidsfootballkit.co.uk",
+  "www.kidsfootballkit.co.uk"
+];
+const LINK_LAST_GOOD_PROXY_KEY = "abk:lastGoodLinkProxy";
+
+function shouldUseLinkProxyFirst(url) {
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    return LINK_PROXY_FIRST_HOSTS.includes(host);
+  } catch (_error) {
+    return false;
+  }
+}
+
+async function checkLinkUrl(url) {
+  if (shouldUseLinkProxyFirst(url)) {
+    return checkLinkWithBrowserProxy(url);
+  }
+
+  const payload = await checkLinkWithBackend(url);
+  if (payload.status_code === 403 || /forbidden/i.test(payload.message || "")) {
+    return checkLinkWithBrowserProxy(url);
+  }
+  return payload;
+}
+
+async function checkLinkWithBackend(url) {
+  const response = await fetch(apiUrl("/api/link-check"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url })
+  });
+  if (!response.ok && !response.headers.get("content-type")?.includes("application/json")) {
+    throw new Error(`${response.status} ${response.statusText}`.trim());
+  }
+  return response.json();
+}
+
+async function checkLinkWithBrowserProxy(url) {
+  const attempts = [];
+  for (const proxy of linkBrowserProxyUrls(url)) {
+    try {
+      const response = await fetchWithTimeout(proxy.url, { method: "HEAD" }, 12000);
+      if (response.status === 405) {
+        const getResponse = await fetchWithTimeout(proxy.url, { method: "GET", headers: { "Accept": "text/html,*/*" } }, 12000);
+        rememberGoodLinkProxy(proxy.name);
+        return {
+          ok: getResponse.status >= 200 && getResponse.status < 400,
+          status_code: getResponse.status,
+          message: `${getResponse.statusText || "Checked"} via ${proxy.name}`,
+          final_url: url
+        };
+      }
+      rememberGoodLinkProxy(proxy.name);
+      return {
+        ok: response.status >= 200 && response.status < 400,
+        status_code: response.status,
+        message: `${response.statusText || "Checked"} via ${proxy.name}`,
+        final_url: url
+      };
+    } catch (error) {
+      attempts.push(`${proxy.name}: ${error.message}`);
+    }
+  }
+  return { ok: false, status_code: "ERR", message: `Browser proxy failed. ${attempts.join(" | ")}`, final_url: url };
+}
+
+function linkBrowserProxyUrls(url) {
+  const encoded = encodeURIComponent(url);
+  const proxies = [
+    { name: "corsproxy.io", url: `https://corsproxy.io/?${encoded}` },
+    { name: "AllOrigins raw", url: `https://api.allorigins.win/raw?url=${encoded}` },
+    { name: "CodeTabs proxy", url: `https://api.codetabs.com/v1/proxy?quest=${encoded}` },
+    { name: "Proxy.CORS.sh", url: `https://proxy.cors.sh/${url}` }
+  ];
+  const lastGoodProxy = localStorage.getItem(LINK_LAST_GOOD_PROXY_KEY);
+  if (!lastGoodProxy) return proxies;
+  return [...proxies].sort((a, b) => (a.name === lastGoodProxy ? -1 : 0) + (b.name === lastGoodProxy ? 1 : 0));
+}
+
+function rememberGoodLinkProxy(proxyName) {
+  try {
+    localStorage.setItem(LINK_LAST_GOOD_PROXY_KEY, proxyName);
+  } catch (_error) {
+    // Ignore storage-disabled environments.
+  }
+}
+
+async function fetchWithTimeout(url, options, timeoutMs) {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
 async function startLinkCheck() {
   const raw = document.getElementById("inp-urls").value;
   const urls = raw.match(/https?:\/\/[^\s<>'"]+/g) || [];
@@ -219,12 +320,7 @@ async function startLinkCheck() {
     const row = addLinkRow("...", url, "Checking...");
 
     try {
-      const response = await fetch(apiUrl("/api/link-check"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url })
-      });
-      const payload = await response.json();
+      const payload = await checkLinkUrl(url);
       row.remove();
       addLinkRow(payload.status_code || "ERR", url, payload.message || "Checked");
       if (payload.ok) stats.live += 1;
@@ -398,3 +494,4 @@ setupWatermark();
 setupLinkChecker();
 setupHtmlCleaner();
 setupSkuGenerator();
+
