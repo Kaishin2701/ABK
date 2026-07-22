@@ -19,7 +19,7 @@ from app.controller import check_product_url
 from checker.config import load_json_config, project_path
 from scraper.product_scraper import is_valid_url
 
-MAX_PRODUCT_WORKERS = 3
+MAX_PRODUCT_WORKERS = 2
 MAX_LINK_WORKERS = 8
 IMAGE_TYPES = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
 
@@ -36,6 +36,8 @@ class ABKToolApp(tk.Tk):
         self.selected_product_index: int | None = None
         self.link_rows: list[dict[str, Any]] = []
         self.stop_link_check = threading.Event()
+        self.stop_product_check = threading.Event()
+        self.product_is_running = False
         self.tool_frames: dict[str, ttk.Frame] = {}
         self.nav_buttons: dict[str, tk.Button] = {}
         self.watermark_images: list[Path] = []
@@ -141,7 +143,11 @@ class ABKToolApp(tk.Tk):
         row.pack(fill="x")
         self.product_input = self._text(row, height=5)
         self.product_input.pack(side="left", fill="x", expand=True)
-        ttk.Button(row, text="CHECK", command=self.start_product_check, style="Accent.TButton").pack(side="left", fill="y", padx=(10, 0))
+        self.product_check_button = ttk.Button(row, text="CHECK", command=self.start_product_check, style="Accent.TButton")
+        self.product_check_button.pack(side="left", fill="y", padx=(10, 0))
+        self.product_stop_button = ttk.Button(row, text="STOP", command=self.stop_product_run, style="Danger.TButton")
+        self.product_stop_button.pack(side="left", fill="y", padx=(8, 0))
+        self.product_stop_button.configure(state="disabled")
         summary = ttk.Frame(frame, style="Root.TFrame")
         summary.pack(fill="x", pady=(0, 12))
         self.product_summary_vars = {"result": tk.StringVar(value="Waiting"), "issues": tk.StringVar(value="0"), "sku": tk.StringVar(value="-"), "reviews": tk.StringVar(value="-")}
@@ -178,6 +184,9 @@ class ABKToolApp(tk.Tk):
         self._set_text(self.product_log, "No product data loaded.", disabled=True)
 
     def start_product_check(self) -> None:
+        if self.product_is_running:
+            messagebox.showinfo("Product Checker", "A product check is already running.")
+            return
         urls = self._extract_lines(self.product_input.get("1.0", "end"))
         invalid = [url for url in urls if not is_valid_url(url)]
         if not urls:
@@ -186,6 +195,10 @@ class ABKToolApp(tk.Tk):
         if invalid:
             messagebox.showerror("Invalid URL", f"Invalid URL:\n{invalid[0]}")
             return
+        self.product_is_running = True
+        self.stop_product_check.clear()
+        self.product_check_button.configure(state="disabled")
+        self.product_stop_button.configure(state="normal")
         self.product_results = [{"url": url, "status": "pending", "product": None, "issues": [], "error": None} for url in urls]
         self.selected_product_index = None
         self._render_product_table()
@@ -194,39 +207,78 @@ class ABKToolApp(tk.Tk):
         self.status_var.set("CHECKING")
         threading.Thread(target=self._product_worker, daemon=True).start()
 
+    def stop_product_run(self) -> None:
+        self.stop_product_check.set()
+        self.status_var.set("STOPPING")
+        self.product_stop_button.configure(state="disabled")
+
     def _product_worker(self) -> None:
         with ThreadPoolExecutor(max_workers=min(MAX_PRODUCT_WORKERS, len(self.product_results) or 1)) as executor:
             futures = {}
             for index, item in enumerate(self.product_results):
+                if self.stop_product_check.is_set():
+                    break
                 self.after(0, lambda i=index: self._mark_product(i, "checking"))
                 futures[executor.submit(check_product_url, item["url"])] = index
             for future in as_completed(futures):
                 index = futures[future]
-                try:
-                    product, issues = future.result()
-                    payload = {"status": "done", "product": product, "issues": issues, "error": None}
-                except Exception as exc:
-                    payload = {"status": "error", "product": None, "issues": [], "error": str(exc)}
+                if self.stop_product_check.is_set():
+                    payload = {"status": "error", "product": None, "issues": [], "error": "Stopped by user."}
+                else:
+                    try:
+                        product, issues = future.result()
+                        payload = {"status": "done", "product": product, "issues": issues, "error": None}
+                    except Exception as exc:
+                        payload = {"status": "error", "product": None, "issues": [], "error": str(exc)}
                 self.after(0, lambda i=index, p=payload: self._update_product(i, p))
-        self.after(0, lambda: self.status_var.set("COMPLETE"))
+        self.after(0, self._finish_product_batch)
+
+    def _finish_product_batch(self) -> None:
+        for index, item in enumerate(self.product_results):
+            if item["status"] in {"pending", "checking"}:
+                item.update({"status": "error", "product": None, "issues": [], "error": "Stopped before this product was checked."})
+                self._set_product_row(index)
+        self.product_is_running = False
+        self.product_check_button.configure(state="normal")
+        self.product_stop_button.configure(state="disabled")
+        self._update_product_summary()
+        self.status_var.set("STOPPED" if self.stop_product_check.is_set() else "COMPLETE")
 
     def _mark_product(self, index: int, status: str) -> None:
+        if index >= len(self.product_results):
+            return
         self.product_results[index]["status"] = status
-        self._render_product_table()
+        self._set_product_row(index)
         self._update_product_summary()
 
     def _update_product(self, index: int, payload: dict[str, Any]) -> None:
+        if index >= len(self.product_results):
+            return
         self.product_results[index].update(payload)
-        self._render_product_table()
+        self._set_product_row(index)
         self._update_product_summary()
         if self.selected_product_index is None:
             self._select_product(index)
+
     def _render_product_table(self) -> None:
         self.product_table.delete(*self.product_table.get_children())
-        for index, item in enumerate(self.product_results):
-            product = item.get("product") or {}
-            evaluation = self._product_eval(item)
-            self.product_table.insert("", "end", iid=str(index), values=(item["url"], product.get("sku") or ("Checking..." if evaluation == "CHECKING" else "-"), self._product_issue_count(item), evaluation), tags=(evaluation.lower(),))
+        for index, _item in enumerate(self.product_results):
+            self._insert_product_row(index)
+
+    def _insert_product_row(self, index: int) -> None:
+        item = self.product_results[index]
+        product = item.get("product") or {}
+        evaluation = self._product_eval(item)
+        self.product_table.insert("", "end", iid=str(index), values=(item["url"], product.get("sku") or ("Checking..." if evaluation == "CHECKING" else "-"), self._product_issue_count(item), evaluation), tags=(evaluation.lower(),))
+
+    def _set_product_row(self, index: int) -> None:
+        if not self.product_table.exists(str(index)):
+            self._insert_product_row(index)
+            return
+        item = self.product_results[index]
+        product = item.get("product") or {}
+        evaluation = self._product_eval(item)
+        self.product_table.item(str(index), values=(item["url"], product.get("sku") or ("Checking..." if evaluation == "CHECKING" else "-"), self._product_issue_count(item), evaluation), tags=(evaluation.lower(),))
 
     def _on_product_select(self, _event: Any) -> None:
         selection = self.product_table.selection()
@@ -602,5 +654,10 @@ class ABKToolApp(tk.Tk):
 def main() -> None:
     app = ABKToolApp()
     app.mainloop()
+
+
+
+
+
 
 
