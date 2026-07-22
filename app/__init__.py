@@ -1,1 +1,1 @@
-﻿"""ABK desktop application package."""
+﻿

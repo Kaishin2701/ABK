@@ -1,3 +1,5 @@
-beautifulsoup4
+﻿beautifulsoup4
+Flask
+gunicorn
 lxml
 requests
