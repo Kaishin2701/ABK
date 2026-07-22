@@ -1,0 +1,24 @@
+﻿{
+  "severity": "NOTICE",
+  "case_code": "DESCRIPTION_LOGIC_001",
+  "case_name": "Validate product type wording in descriptions by SKU",
+  "sku_type_map": {
+    "HO": "Home",
+    "AW": "Away",
+    "TH": "Third",
+    "GK": "Goalkeeper",
+    "TN": "Training"
+  },
+  "type_keywords": {
+    "Home": ["home"],
+    "Away": ["away"],
+    "Third": ["third", "3rd"],
+    "Goalkeeper": ["goalkeeper", "goal keeper", "gk"],
+    "Training": ["training", "trainning"]
+  },
+  "heading_only_types": ["Training"],
+  "ignored_phrases": [
+    "contact us right away for any damage",
+    "right away for any damage"
+  ]
+}

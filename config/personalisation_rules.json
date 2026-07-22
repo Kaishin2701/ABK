@@ -1,0 +1,6 @@
+﻿{
+  "severity": "WARNING",
+  "case_code": "PERSONALISE_001",
+  "case_name": "Validate personalisation form by printed status",
+  "form_keywords": ["personal", "name number"]
+}

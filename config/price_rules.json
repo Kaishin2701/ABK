@@ -1,0 +1,28 @@
+﻿{
+  "severity": "NOTICE",
+  "case_code": "PRICE_001",
+  "case_name": "Validate product pricing against the standard price table",
+  "currency": "£",
+  "price_tolerance": 0.01,
+  "printed_add_on_price": 10.0,
+  "product_prices": {
+    "Kid Kit (No Socks)": 25.99,
+    "Kid Kit (With Socks)": 27.99,
+    "Adult Kit (No Socks)": 27.99,
+    "Adult Kit (With Socks)": 29.99,
+    "Men's Shirt / Women's Shirt": 27.99,
+    "Retro Kid Kit (No Socks)": 26.99,
+    "Retro Kid Kit (With Socks) / Retro Men Shirt": 28.99
+  },
+  "bundle_prices": {
+    "Bundle - Kids No Socks": 44.99,
+    "Bundle - Kids With Socks": 47.99,
+    "Bundle - Men Shirt": 47.99,
+    "Printed upgrade (add to any bundle)": 20.0
+  },
+  "add_on_prices": {
+    "Badge Add-on": 3.49,
+    "Personalisation Add-on (individual product)": 10.0,
+    "Personalisation Add-on (bundle item)": 8.0
+  }
+}

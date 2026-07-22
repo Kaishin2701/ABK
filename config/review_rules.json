@@ -1,0 +1,6 @@
+﻿{
+  "severity": "NOTICE",
+  "case_code": "REVIEW_001",
+  "case_name": "Validate that the product has at least one review",
+  "minimum_reviews": 1
+}

@@ -1,0 +1,7 @@
+﻿{
+  "CRITICAL": {"bg": "#7f1d1d", "fg": "#ffffff"},
+  "MAJOR": {"bg": "#dc2626", "fg": "#ffffff"},
+  "WARNING": {"bg": "#f97316", "fg": "#111827"},
+  "NOTICE": {"bg": "#facc15", "fg": "#111827"},
+  "IMPROVEMENT": {"bg": "#38bdf8", "fg": "#0f172a"}
+}

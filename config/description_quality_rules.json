@@ -1,0 +1,8 @@
+﻿{
+  "severity": "IMPROVEMENT",
+  "case_code": "DESCRIPTION_QUALITY_001",
+  "case_name": "Detect outdated description content that should be improved",
+  "deprecated_phrases": [
+    "Check out our full collection"
+  ]
+}

@@ -1,0 +1,11 @@
+﻿{
+  "severity": "WARNING",
+  "case_code": "SIZE_CHART_001",
+  "case_name": "Validate size chart images by SKU code",
+  "size_chart_titles": {
+    "KD": ["RFS Kid size chart"],
+    "AD": ["RFS Men Size Chart", "rfs-men-football-shirt-size-chart-3xl-4xl-final"],
+    "ADK": ["RFS adult football kit size chart"],
+    "WM": ["RFS-Women-Size-Chart- Update2026", "RFS women size chart"]
+  }
+}

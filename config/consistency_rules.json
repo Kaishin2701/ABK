@@ -1,0 +1,15 @@
+﻿{
+  "severity": "WARNING",
+  "case_code": "CONSISTENCY_001",
+  "case_name": "Validate consistency between title, SKU, and additional information",
+  "sku_type_map": {
+    "HO": "Home",
+    "AW": "Away",
+    "TH": "Third",
+    "GK": "Goalkeeper",
+    "TN": "Training"
+  },
+  "national_team_indicators": ["National Team"],
+  "team_fields": ["Club Name", "National Team", "Team", "Country"],
+  "season_field": "Season"
+}

@@ -1,0 +1,8 @@
+﻿{
+  "severity": "WARNING",
+  "case_code": "CATEGORY_001",
+  "case_name": "Validate product categories by club or national team",
+  "category_file": "data/rfs/categories.csv",
+  "continents": ["AFRICA / MIDDLE EAST", "ASIA", "EUROPE", "NORTH AMERICA", "SOUTH AMERICA"],
+  "non_club_parents": ["International Teams", "Players", "Best Offers", "Retro Shirts & Kits"]
+}
