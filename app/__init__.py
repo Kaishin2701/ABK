@@ -9,7 +9,7 @@ from flask import Flask, jsonify, make_response, render_template, request
 
 from app.controller import check_product_url
 from checker.config import load_json_config
-from scraper.product_scraper import is_valid_url
+from scraper.product_scraper import is_valid_url, proxy_config
 
 app = Flask(__name__, template_folder="../templates", static_folder="../static")
 
@@ -104,9 +104,10 @@ def link_check():
         "Accept-Language": "en-US,en;q=0.9",
     }
     try:
-        response = requests.head(url, headers=headers, allow_redirects=True, timeout=8)
+        proxies = proxy_config()
+        response = requests.head(url, headers=headers, allow_redirects=True, timeout=8, proxies=proxies)
         if response.status_code in {403, 405}:
-            response = requests.get(url, headers=headers, allow_redirects=True, timeout=8, stream=True)
+            response = requests.get(url, headers=headers, allow_redirects=True, timeout=8, stream=True, proxies=proxies)
         status_code = response.status_code
         return jsonify(
             {
@@ -128,3 +129,4 @@ def health():
 def main() -> None:
     port = int(os.environ.get("PORT", "5000"))
     app.run(host="0.0.0.0", port=port, debug=os.environ.get("FLASK_DEBUG") == "1")
+

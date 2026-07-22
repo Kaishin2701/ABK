@@ -7,7 +7,7 @@ ABK Tool is a Flask web application for checking and preparing Replica Football 
 - Product Checker: paste one or more product URLs, run all configured test cases, and review PASS/FAIL results per product.
 - Detailed issue view: click a product row, then use View more to inspect the test case, found value, expected value, and explanation.
 - Auto Watermark: batch process product images in the browser and export WebP files or a ZIP package.
-- Link Checker: check multiple URLs through the Flask backend to avoid browser CORS issues.
+- Link Checker: check multiple URLs through the Flask backend.
 - HTML Cleaner: clean pasted HTML by removing unnecessary wrapper tags and unsafe/unneeded attributes.
 - SKU Generator: generate size variant SKUs for AD, KD, and ADK/KD product patterns.
 
@@ -15,28 +15,32 @@ ABK Tool is a Flask web application for checking and preparing Replica Football 
 
 ```text
 ABK_CHECKER_2/
-├── app/                  # Application controller layer
+├── app/                  # Flask app, web routes, and API endpoints
 ├── checker/              # Test case engine and checker models
 │   └── cases/            # Individual product test cases
 ├── config/               # Editable JSON rules for prices, categories, sizes, descriptions, etc.
 ├── data/                 # Reference data such as RFS category mapping
-├── scraper/              # Product scraping and parsing logic
+├── scraper/              # HTML scraping and parsing logic
 ├── static/               # CSS, JavaScript, logo, and watermark assets
 ├── templates/            # Flask HTML template
 ├── main.py               # Local entry point
-├── web_app.py            # Flask routes and API endpoints
+├── web_app.py            # Compatibility entry point for gunicorn
 ├── requirements.txt      # Python dependencies
 ├── Procfile              # Platform start command
 └── render.yaml           # Render deployment config
 ```
 
-## How It Works
+## Scraping Policy
 
-1. The browser sends product URLs to the Flask API.
-2. `scraper/` downloads and extracts product data such as title, SKU, categories, prices, images, descriptions, reviews, and additional information.
-3. `checker/engine.py` runs every case in `checker/cases/`.
-4. Each case reads rule data from `config/` where possible, so valid prices, category mappings, size chart titles, and wording rules can be updated without editing the main UI code.
-5. The web UI displays a batch result table and lets the user inspect issue details only when needed.
+The Product Checker uses HTML page scraping only. It does not use the RFS WooCommerce or WordPress API.
+
+If the source website blocks the Render server IP with `403 Forbidden`, configure a permitted proxy/VPN endpoint with this environment variable:
+
+```text
+SCRAPER_PROXY_URL=http://user:password@proxy-host:port
+```
+
+The same proxy is used by Product Checker and backend Link Checker requests.
 
 ## Local Run
 
@@ -76,6 +80,6 @@ Recommended deployment flow:
 3. Connect the GitHub repository.
 4. Use:
    - Build command: `pip install -r requirements.txt`
-   - Start command: `gunicorn web_app:app`
+   - Start command: `gunicorn --workers 2 --threads 4 --timeout 120 web_app:app`
 
 `render.yaml` and `Procfile` are included for deployment-friendly hosting.
